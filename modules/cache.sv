@@ -1,3 +1,4 @@
+`include "modules/constants.sv"
 import cpu_params::*;
 
 module TLB #(
@@ -16,35 +17,33 @@ module TLB #(
 
     integer i;
 
-    reg[1:0] state;
+    reg state;
 
-    reg[(2*page_adress_width)-1:0] page_map;
+    reg[(2*page_adress_width)-1:0] page_map[size-1:0];
     reg[$clog2(size)-1:0] out_ptr;
     reg[$clog2(size)-1:0] last_ptr;
 
-    parameter TLB_IDLE = 2'b00;
-    parameter TLB_COMPARE = 2'b01;
-    parameter TLB_FAULT = 2'b10;
-
-    initial
-        page_map[0] = 40'hFFFFF00000;
+    parameter TLB_COMPARE = 1'b0;
+    parameter TLB_FAULT = 1'b1;
 
     always @(posedge clk) begin 
         if(rst) begin
-            for(i = 0; i < (2*page_adress_width); i++) 
+            for(i = 0; i < size; i++)
                 page_map[i] <= 0;
+            page_map[0] <= 40'hFFFFF00000;
             last_ptr <= 0;
-            state <= TLB_IDLE;
+            state <= TLB_COMPARE;
         end
         else begin
             case(state)
                 TLB_COMPARE: begin 
                     if(enable) begin 
                         for(i = 0; i < $clog2(size); i++) begin
-                            if(page_map[i +:1][0][(2*page_adress_width)-1 : page_adress_width] == compare_input[bit_count-1 : $clog2(page_size)])
-                                out_ptr <= i;
+                            if(page_map[i][(2*page_adress_width)-1:page_adress_width] == compare_input[bit_count-1:$clog2(page_size)]) begin
+                                compare_output[bit_count-1:$clog2(page_size)] <= page_map[i][(2*page_adress_width)-1:page_adress_width];
+                                compare_output[$clog2(page_size):0] <= compare_input[$clog2(page_size):0];
+                            end                                
                         end
-                        compare_output = page_map[out_ptr][page_adress_width:0];
                     end
                 end
             endcase
@@ -70,7 +69,7 @@ module TLB_TB;
         clk = 0; 
     	rst = 1; 
         enable = 0;
-        ci = 32'hFFFFFF00;
+        ci = 32'hFFFFF000;
         clk = 1; #1 ; clk = 0; #1;
     	rst = 0;
 
