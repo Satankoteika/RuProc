@@ -1,4 +1,4 @@
-`include "constants.sv"
+`include "modules/constants.sv"
 import cpu_params::*;
 
 module TLB #(
@@ -103,45 +103,45 @@ interface CacheRead #(
 ) (
     input wire[address_width-1:0] address[0:count-1],
     output reg[width-1:0] read_value[0:count-1]
-)
+);
 endinterface
 
 interface CacheTLB #(
     parameter width, address_width, count
 ) (
-    input wire fault_tlb;
-    input wire[bit_count-1:0] physical_adress_tlb;
-    output reg enable_tlb;
-    output reg[bit_count-1:0] compare_tlb;
-)
+    input wire fault_tlb,
+    input wire[bit_count-1:0] physical_adress_tlb,
+    output reg enable_tlb,
+    output reg[bit_count-1:0] compare_tlb
+);
 endinterface
 
-interface CacheInterface #(
+/* interface CacheInterface #(
 
     
 
 ) (
 
-)
-endinterface
+);
+endinterface */
 
-module Cache #(
+/* module Cache #(
     parameter size = 1024, cache_line = 4, way_count = 2,
-    localparam sets = size/(cache_line*way_count),  
+    localparam sets = size/(cache_line*way_count)  
 ) (
-    input wire clk;
+    input wire clk,
     input wire[adress_width-1:0] address,
     input wire write,
     input wire read,
     output reg[7:0] out_value
-)
+);
 
     reg[7:0] memory[0:size-1];
     
     always @(posedge clk) begin 
 
-        if(write && !read)
+        //if(write && !read)
 
     end
 
-endmodule
+endmodule */
