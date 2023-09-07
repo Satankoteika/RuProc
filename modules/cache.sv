@@ -1,4 +1,4 @@
-`include "modules/constants.sv"
+`include "constants.sv"
 import cpu_params::*;
 
 module TLB #(
@@ -98,16 +98,8 @@ module TLB_TB;
 
 endmodule
 
-interface CacheRead #(
-    parameter width, address_width, count
-) (
-    input wire[address_width-1:0] address[0:count-1],
-    output reg[width-1:0] read_value[0:count-1]
-);
-endinterface
-
 interface CacheTLB #(
-    parameter width, address_width, count
+    parameter width, address_width
 ) (
     input wire fault_tlb,
     input wire[bit_count-1:0] physical_adress_tlb,
@@ -116,20 +108,69 @@ interface CacheTLB #(
 );
 endinterface
 
-/* interface CacheInterface #(
-
-    
-
+interface CacheRead #(
+    parameter width, address_width
 ) (
-
+    input wire enable,
+    input wire[address_width-1:0] address,
+    output reg[width-1:0] read_value
 );
-endinterface */
+endinterface
+
+interface CacheWrite #(
+    parameter width, address_width
+) (
+    input wire enable,
+    input wire[width-1:0] read_value,
+    output reg[address_width-1:0] address
+);
+endinterface
+
+module CacheL1 #(
+    parameter size = 65536, cache_line = 32, way_count = 4,
+    localparam sets = size/(cache_line*way_count)  
+) (
+    input wire clk,
+    CacheRead out,
+    CacheWrite in,
+    CacheTLB tlb
+);
+    
+    integer i;
+
+    reg state;
+    parameter CACHE_ACCESS = 1'b0;
+    parameter CACHE_TLB_FETCH = 1'b1;
+
+    reg[$clog2(sets)+$clog2(way_count)+cache_line*8-1:0] memory[0:sets-1][0:way_count-1];
+
+    always @(posedge clk) begin 
+        case(state)
+            CACHE_ACCESS: begin 
+                for(i = 0; i < out.count; i++) begin 
+                    if(out.enable) begin 
+                        tlb.compare_tlb <= out.address;
+                        tlb.enable <= 1;
+                    end
+                end
+            end
+            CACHE_TLB_FETCH: begin 
+                tlb.enable <= 0;
+                for(i = 0; i < way_count) begin 
+                    if(memory[out.address[$clog2(cache_line*sets)-1:$clog2(cache_line)]][i][out.address[out.adress_width-1:$clog2(cache_line*sets)]])
+                end
+            end
+        endcase
+    end
+
+endmodule
 
 /* module Cache #(
     parameter size = 1024, cache_line = 4, way_count = 2,
     localparam sets = size/(cache_line*way_count)  
 ) (
     input wire clk,
+    input wire rst,
     input wire[adress_width-1:0] address,
     input wire write,
     input wire read,
