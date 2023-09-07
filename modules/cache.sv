@@ -1,4 +1,4 @@
-`include "modules/constants.sv"
+`include "constants.sv"
 import cpu_params::*;
 
 module TLB #(
@@ -30,7 +30,6 @@ module TLB #(
         if(rst) begin
             for(i = 0; i < size; i++)
                 page_map[i] <= 0;
-            page_map[0] <= 40'hFFFFF00000;
             last_ptr <= 0;
             state <= TLB_COMPARE;
         end
@@ -38,12 +37,24 @@ module TLB #(
             case(state)
                 TLB_COMPARE: begin 
                     if(enable) begin 
+                        fault <= 1;
+                        state <= TLB_FAULT;
                         for(i = 0; i < $clog2(size); i++) begin
                             if(page_map[i][(2*page_adress_width)-1:page_adress_width] == compare_input[bit_count-1:$clog2(page_size)]) begin
                                 compare_output[bit_count-1:$clog2(page_size)] <= page_map[i][(2*page_adress_width)-1:page_adress_width];
-                                compare_output[$clog2(page_size):0] <= compare_input[$clog2(page_size):0];
+                                compare_output[$clog2(page_size)-1:0] <= compare_input[$clog2(page_size)-1:0];
+                                fault <= 0;
+                                state <= TLB_COMPARE;
                             end                                
                         end
+                    end
+                end
+                TLB_FAULT: begin 
+                    if(unfault) begin 
+                        page_map[last_ptr][(2*page_adress_width)-1:page_adress_width] <= compare_input[bit_count-1:$clog2(page_size)];
+                        page_map[last_ptr][page_adress_width-1:0] <= fault_input[bit_count-1:$clog2(page_size)];
+                        state <= TLB_COMPARE;
+                        last_ptr <= last_ptr + 1;
                     end
                 end
             endcase
@@ -69,18 +80,25 @@ module TLB_TB;
         clk = 0; 
     	rst = 1; 
         enable = 0;
-        ci = 32'hFFFFF000;
+        ci = 32'hFFFFF00A;
         clk = 1; #1 ; clk = 0; #1;
     	rst = 0;
 
         enable = 1;
+        clk = 1; #1 ; clk = 0; #1;
+        $display("%h", fault);
+        clk = 1; #1 ; clk = 0; #1;
+        fi = 32'h10000000;
+        unfault = 1;
+        clk = 1; #1 ; clk = 0; #1;
+        ci = 32'hFFFFF00B;
         clk = 1; #1 ; clk = 0; #1;
         $display("%h", co);
     end
 
 endmodule
 
-/*interface CacheRead #(
+interface CacheRead #(
     parameter width, address_width, count
 ) (
     input wire[address_width-1:0] address[0:count-1],
@@ -88,10 +106,13 @@ endmodule
 )
 endinterface
 
-interface CacheFetchVirtual #(
-    parameter address_width
+interface CacheTLB #(
+    parameter width, address_width, count
 ) (
-    input wire[address_width-1:0] address,
+    input wire fault_tlb;
+    input wire[bit_count-1:0] physical_adress_tlb;
+    output reg enable_tlb;
+    output reg[bit_count-1:0] compare_tlb;
 )
 endinterface
 
@@ -123,4 +144,4 @@ module Cache #(
 
     end
 
-endmodule*/
+endmodule
