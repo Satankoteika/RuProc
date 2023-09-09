@@ -1,7 +1,7 @@
 `include "constants.sv"
 import cpu_params::*;
 
-module TLB #(
+/* module TLB #(
     parameter size,
     localparam page_adress_width = ram_address_width - $clog2(page_size)
 ) (
@@ -61,11 +61,100 @@ module TLB #(
         end
     end
 
+endmodule */
+
+module TLB #(
+    parameter size_bits, associativity_bits = size_bits, port_count = 1,
+    localparam size = 2**size_bits, associativity = 2**associativity_bits,
+    localparam page_adress_width = ram_address_width - page_offset_bits, set_count = size/associativity
+) (
+    input wire clk,
+    input wire rst,
+    input wire write_enable,
+    input wire read_enable,
+    input wire[page_adress_width-1:0] key_address_write,
+    input wire[page_adress_width-1:0] value_address_write,
+    input wire[page_adress_width-1:0] key_address_read[0:port_count-1],
+    output reg[page_adress_width-1:0] output_address[0:port_count-1]
+);
+
+    integer i, j;
+
+    reg[page_adress_width-1:0] key_address[0:set_count-1][0:associativity-1];
+    reg[page_adress_width-1:0] value_address[0:set_count-1][0:associativity-1];
+
+    reg[$clog2(set_count)-1:0] last_index[0:set_count-1];
+
+    always @(posedge clk) begin 
+        if(rst) begin 
+            for(i = 0; i < set_count; i++) begin 
+                for(j = 0; j < associativity; j++) begin 
+                    key_address[i][j] <= 0;
+                end
+            end
+            for(i = 0; i < set_count; i++) begin 
+                last_index[i] <= 0;
+            end         
+        end
+        else if(write_enable) begin
+            key_address[key_address_write[$clog2(set_count)-1:0]][last_index[key_address_write[$clog2(set_count)-1:0]]] <= key_address_write;
+            value_address[key_address_write[$clog2(set_count)-1:0]][last_index[key_address_write[$clog2(set_count)-1:0]]] <= value_address_write;
+            last_index[key_address_write[$clog2(set_count)-1:0]] <= last_index[key_address_write[$clog2(set_count)-1:0]] + 1;
+        end
+        else if(read_enable) begin
+            for(i = 0; i < port_count; i++) begin
+                for(j = 0; j < associativity; j++) begin
+                    if(key_address[key_address_read[i][$clog2(set_count)-1:0]][j] == key_address_read[i]) begin 
+                        output_address[i] <= value_address[key_address_read[i][$clog2(set_count)-1:0]][j];
+                    end
+                end
+            end
+        end
+    end
+
+    initial begin 
+        $monitor("%h %h %h %h %h %h\n", key_address[0][0], key_address[1][0], key_address[0][1], key_address[1][1], output_address[0], output_address[1]);
+    end
+
 endmodule
 
 module TLB_TB;
 
     reg clk;
+  	reg rst;
+    reg write_enable;
+    reg read_enable;
+    reg[ram_address_width - page_offset_bits] key_address;
+    reg[ram_address_width - page_offset_bits] value_address;
+    reg[ram_address_width - page_offset_bits] key_address_read[2];
+    reg[ram_address_width - page_offset_bits] output_address[2];
+
+    TLB #(.size_bits(2), .associativity_bits(1), .port_count(2)) tlb(clk, rst, write_enable, read_enable, key_address, value_address, key_address_read, output_address);
+    
+    initial begin
+        clk = 0; 
+    	rst = 1; 
+        write_enable = 0;
+        key_address = 20'hFFFFF;
+        value_address = 20'hAABB0;
+        clk = 1; #1 ; clk = 0; #1;
+    	rst = 0;
+
+        write_enable = 1;
+        clk = 1; #1 ; clk = 0; #1;
+        key_address = 20'h01010;
+        value_address = 20'hAABA0;
+        clk = 1; #1 ; clk = 0; #1;
+        key_address = 20'h01110;
+        value_address = 20'hAABF0;
+        clk = 1; #1 ; clk = 0; #1;
+        key_address_read[0] = 20'h01110;
+        key_address_read[1] = 20'h01010;
+        write_enable = 0;
+        read_enable = 1;
+        clk = 1; #1 ; clk = 0; #1;
+    end
+    /* reg clk;
   	reg rst;
     reg enable;
     reg unfault;
@@ -94,11 +183,11 @@ module TLB_TB;
         ci = 32'hFFFFF00B;
         clk = 1; #1 ; clk = 0; #1;
         $display("%h", co);
-    end
+    end */
 
 endmodule
 
-interface CacheTLB #(
+/* interface CacheTLB #(
     parameter width, address_width
 ) (
     input wire fault_tlb,
@@ -124,9 +213,9 @@ interface CacheWrite #(
     input wire[width-1:0] read_value,
     output reg[address_width-1:0] address
 );
-endinterface
+endinterface */
 
-module CacheL1 #(
+/* module CacheL1 #(
     parameter size = 65536, cache_line = 32, way_count = 4,
     localparam sets = size/(cache_line*way_count)  
 ) (
@@ -163,7 +252,7 @@ module CacheL1 #(
         endcase
     end
 
-endmodule
+endmodule */
 
 /* module Cache #(
     parameter size = 1024, cache_line = 4, way_count = 2,
